@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime
 from .collectors.base import Article
@@ -7,87 +8,138 @@ logger = logging.getLogger(__name__)
 
 
 class MessageFormatter:
-    """キュレーション済み記事を LINE メッセージに整形"""
+    """キュレーション済み記事を LINE フレックスメッセージに整形"""
 
-    def format_line_message(self, articles: list[Article]) -> str:
-        """LINE メッセージを生成"""
+    def format_line_message(self, articles: list[Article]) -> dict:
+        """LINE フレックスメッセージ（Flex Message）を生成"""
         if not articles:
-            return "本日配信する記事がありません。"
+            return {
+                "type": "text",
+                "text": "本日配信する記事がありません。"
+            }
 
-        # スコア順でソート、高スコアから選ぶ
         scored_articles = [a for a in articles if a.curator_score is not None]
         scored_articles.sort(key=lambda x: x.curator_score, reverse=True)
 
-        # ジャンルごとにバランスを取る
         selected = self._select_balanced_articles(scored_articles, TARGET_ARTICLE_COUNT)
 
-        # メッセージを構築
-        message = self._build_message(selected)
-        return message
+        return self._build_flex_message(selected)
 
     def _select_balanced_articles(self, articles: list[Article], target_count: int) -> list[Article]:
-        """
-        ジャンルバランスを考慮して記事を選択
-        各ジャンルから最低1件を確保
-        """
+        """ジャンルバランスを考慮して記事を選択"""
         if not articles:
             return []
 
         selected = []
         by_genre = {}
 
-        # ジャンルごとにグループ化
         for article in articles:
             genre = article.genre or "unknown"
             if genre not in by_genre:
                 by_genre[genre] = []
             by_genre[genre].append(article)
 
-        # 各ジャンルから1件ずつ選ぶ
         for genre, genre_articles in by_genre.items():
             if genre_articles:
                 selected.append(genre_articles[0])
 
-        # まだ足りない場合は高スコア順に追加
         if len(selected) < target_count:
             remaining = [a for a in articles if a not in selected]
             selected.extend(remaining[:target_count - len(selected)])
 
         return selected[:target_count]
 
-    def _build_message(self, articles: list[Article]) -> str:
-        """LINE メッセージを構築"""
-        timestamp = datetime.now().strftime("%Y年%m月%d日 %H:%M")
+    def _build_flex_message(self, articles: list[Article]) -> dict:
+        """LINE フレックスメッセージを構築"""
+        timestamp = datetime.now().strftime("%m月%d日")
 
-        # ジャンルごとにグループ化
-        by_genre = {}
+        bubbles = []
         for article in articles:
-            genre = article.genre or "unknown"
-            if genre not in by_genre:
-                by_genre[genre] = []
-            by_genre[genre].append(article)
+            genre_config = GENRES.get(article.genre, {})
+            emoji = genre_config.get("emoji", "📄")
+            genre_label = genre_config.get("label", "その他")
 
-        lines = []
-        lines.append(f"📰 {timestamp} の朝刊")
-        lines.append("")
+            # スコアを星表示
+            score = article.curator_score or 0
+            stars = "⭐" * min(5, score // 2)
 
-        # ジャンルごとに表示
-        for genre_key, genre_config in GENRES.items():
-            if genre_key in by_genre:
-                genre_articles = by_genre[genre_key]
-                emoji = genre_config.get("emoji", "")
-                label = genre_config["label"]
+            bubble = {
+                "type": "bubble",
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "baseline",
+                            "spacing": "sm",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "text": emoji,
+                                    "size": "sm",
+                                    "color": "#aaaaaa"
+                                },
+                                {
+                                    "type": "text",
+                                    "text": genre_label,
+                                    "size": "sm",
+                                    "color": "#aaaaaa",
+                                    "margin": "md",
+                                    "flex": 0
+                                }
+                            ]
+                        },
+                        {
+                            "type": "text",
+                            "text": article.title[:50],
+                            "weight": "bold",
+                            "size": "md",
+                            "margin": "md",
+                            "wrap": True
+                        },
+                        {
+                            "type": "text",
+                            "text": article.curator_summary[:60] if article.curator_summary else "要約なし",
+                            "size": "xs",
+                            "color": "#666666",
+                            "margin": "md",
+                            "wrap": True
+                        },
+                        {
+                            "type": "text",
+                            "text": stars if stars else "未評価",
+                            "size": "xs",
+                            "color": "#FFB300",
+                            "margin": "md"
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "button",
+                            "action": {
+                                "type": "uri",
+                                "label": "記事を読む",
+                                "uri": article.url
+                            },
+                            "style": "link",
+                            "height": "sm"
+                        }
+                    ]
+                }
+            }
+            bubbles.append(bubble)
 
-                lines.append(f"{emoji} {label}")
-                for i, article in enumerate(genre_articles, 1):
-                    score_bar = "★" * min(5, article.curator_score // 2) if article.curator_score else ""
-                    lines.append(f"{i}. {article.title}")
-                    lines.append(f"   {article.curator_summary or ''}")
-                    lines.append(f"   🔗 {article.url}")
-                    if score_bar:
-                        lines.append(f"   {score_bar}")
-                lines.append("")
-
-        lines.append("🎯 今日も頑張ろう！")
-
-        return "\n".join(lines)
+        return {
+            "type": "flex",
+            "altText": f"📰 {timestamp} の朝刊",
+            "contents": {
+                "type": "carousel",
+                "contents": bubbles
+            }
+        }

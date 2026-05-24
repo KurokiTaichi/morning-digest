@@ -15,23 +15,24 @@ class LineSender:
     }
 
     @staticmethod
-    def send_message(text: str) -> bool:
+    def send_message(message_content) -> bool:
         """
-        テキストメッセージを送信
+        メッセージを送信（テキスト or フレックスメッセージ）
         返り値: 成功時 True、失敗時 False
         """
         if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_USER_ID:
             logger.error("LINE_CHANNEL_ACCESS_TOKEN or LINE_USER_ID is not set")
             return False
 
+        # message_content が文字列の場合はテキストメッセージに、辞書の場合はそのまま使用
+        if isinstance(message_content, str):
+            messages = [{"type": "text", "text": message_content}]
+        else:
+            messages = [message_content]
+
         payload = {
             "to": LINE_USER_ID,
-            "messages": [
-                {
-                    "type": "text",
-                    "text": text
-                }
-            ]
+            "messages": messages
         }
 
         try:
