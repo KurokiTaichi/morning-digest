@@ -17,98 +17,123 @@ class ArticleCurator:
     def curate(self, articles: list[Article]) -> list[Article]:
         """
         全記事を Claude Haiku で一括評価
-        スコア（0-10）とジャンル、日本語要約を付与
+        スコア（0-10）とジャンルを付与、別処理で日本語要約を生成
         """
         if not articles:
             return []
 
-        # 評価用プロンプトを構築
+        # ステップ1: スコア＋ジャンルの評価（シンプルな JSON）
+        articles = self._evaluate_articles(articles)
+
+        # ステップ2: 日本語要約の生成
+        articles = self._generate_summaries(articles)
+
+        return articles
+
+    def _evaluate_articles(self, articles: list[Article]) -> list[Article]:
+        """スコアとジャンルだけを評価（JSON をシンプルに）"""
         articles_list = "\n".join(
-            [f"{i+1}. [{article.title}] | {article.url}" for i, article in enumerate(articles)]
+            [f"{i+1}. {article.title}" for i, article in enumerate(articles)]
         )
 
-        # ジャンルキーワード定義（プロンプトに含める）
         genres_description = "\n".join([
-            f"- {genre_key}: {config['label']} (キーワード: {', '.join(config['keywords'])})"
+            f"{genre_key}: {config['label']}"
             for genre_key, config in GENRES.items()
             if 'keywords' in config
         ])
 
-        system_prompt = """あなたはニュースキュレーターです。
-与えられた記事リストを評価し、JSON形式で結果を返してください。
-説明や余計なテキストは不要です。JSONのみ出力してください。"""
+        system_prompt = "JSONのみで返答してください。説明は不要です。"
 
-        user_prompt = f"""以下の記事リストを評価してください。
+        user_prompt = f"""記事をジャンル分類・スコアリングしてください。
 
-【対象ジャンル】
+【ジャンル】
 {genres_description}
 
-【記事リスト】
+【記事】
 {articles_list}
 
-【評価方法】
-各記事について、関連度とスコアをつけてください。
-- score 8以上: 高関連・高品質（今日読む価値あり）
-- score 5-7: 関連あり
-- score 4以下: 関連薄い
-
-【出力形式】必ず JSON のみ（マークダウン記号なし）
-各要約は1行で、改行は含めない。日本語テキストは必ずダブルクォートで囲む。
-
-[{{"id": 1, "score": 9, "genre": "ai_tech", "summary_ja": "OpenAIが新型AIモデルを発表。推論機能が改善され従来より35%高速化。複雑問題の解決能力も向上し研究開発での期待が高い。"}}, {{"id": 2, "score": 6, "genre": "business", "summary_ja": "スタートアップ資金調達のポイント解説。VC交渉術・投資条件・デューデリジェンス対策など実例で説明。初期から後期の調達戦略の違いも解説。"}}]
-"""
+【形式】各行で: {{"id": 数字, "score": 0-10, "genre": "ai_tech|pm_product|business|finance"}}"""
 
         try:
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2000,
+                max_tokens=1000,
                 system=system_prompt,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": user_prompt
-                    }
-                ]
+                messages=[{"role": "user", "content": user_prompt}]
             )
 
             response_text = response.content[0].text
 
-            # JSON をパース
-            try:
-                # JSON ブロックを抽出（マークダウンの場合に対応）
-                if "```json" in response_text:
-                    json_str = response_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in response_text:
-                    json_str = response_text.split("```")[1].split("```")[0].strip()
-                else:
-                    json_str = response_text.strip()
+            # 各行をパース
+            for line in response_text.strip().split("\n"):
+                if not line.strip():
+                    continue
+                try:
+                    result = json.loads(line)
+                    article_id = result.get("id")
+                    if article_id and 0 < article_id <= len(articles):
+                        articles[article_id - 1].curator_score = result.get("score", 5)
+                        articles[article_id - 1].genre = result.get("genre", "unknown")
+                except json.JSONDecodeError:
+                    pass
 
-                results = json.loads(json_str)
-
-                # 評価結果を元の記事に付与
-                result_map = {r["id"]: r for r in results}
-
-                for i, article in enumerate(articles):
-                    article_id = i + 1
-                    if article_id in result_map:
-                        result = result_map[article_id]
-                        article.curator_score = result.get("score", 0)
-                        article.curator_summary = result.get("summary_ja", "")
-                        article.genre = result.get("genre", "")
-
-                logger.info(f"Curated {len(articles)} articles successfully")
-                return articles
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse curator response as JSON: {e}")
-                logger.debug(f"Response text: {response_text[:500]}")
-                # JSON パース失敗時はデフォルトスコアを使用
-                for i, article in enumerate(articles):
-                    article.curator_score = 5
-                    article.curator_summary = article.title[:60]
-                    article.genre = "unknown"
-                return articles
+            logger.info(f"Evaluated {len(articles)} articles")
+            return articles
 
         except Exception as e:
-            logger.error(f"Error in curator API call: {e}")
+            logger.error(f"Error evaluating articles: {e}")
+            # デフォルト値を設定
+            for article in articles:
+                article.curator_score = 5
+                article.genre = "unknown"
+            return articles
+
+    def _generate_summaries(self, articles: list[Article]) -> list[Article]:
+        """日本語要約を生成"""
+        # スコアが 5 以上の記事だけ要約を生成
+        high_score_articles = [a for a in articles if a.curator_score and a.curator_score >= 5]
+
+        if not high_score_articles:
+            for article in articles:
+                article.curator_summary = ""
+            return articles
+
+        summaries_prompt = """以下のタイトルについて、60-100字の日本語要約を1行で生成してください。
+改行は含めないでください。
+
+"""
+        for article in high_score_articles:
+            summaries_prompt += f"ID{articles.index(article)+1}: {article.title}\n"
+
+        summaries_prompt += "\n出力形式: ID番号: 要約テキスト"
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[{"role": "user", "content": summaries_prompt}]
+            )
+
+            response_text = response.content[0].text
+
+            # 出力をパース
+            for line in response_text.strip().split("\n"):
+                if ":" not in line:
+                    continue
+                try:
+                    id_str, summary = line.split(":", 1)
+                    article_id = int(id_str.replace("ID", "").strip())
+                    if 0 < article_id <= len(articles):
+                        articles[article_id - 1].curator_summary = summary.strip()[:100]
+                except (ValueError, IndexError):
+                    pass
+
+            logger.info("Generated summaries")
+            return articles
+
+        except Exception as e:
+            logger.error(f"Error generating summaries: {e}")
+            # 要約なしで返す
+            for article in articles:
+                article.curator_summary = ""
             return articles
