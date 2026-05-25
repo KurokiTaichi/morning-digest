@@ -120,7 +120,7 @@ class MessageFormatter:
                         },
                         {
                             "type": "text",
-                            "text": article.curator_summary if article.curator_summary else "要約なし",
+                            "text": (article.curator_summary[:180] if article.curator_summary and len(article.curator_summary) > 180 else article.curator_summary) if article.curator_summary else "要約なし",
                             "size": "xs",
                             "color": "#666666",
                             "margin": "md",

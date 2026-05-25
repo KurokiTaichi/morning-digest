@@ -105,8 +105,12 @@ class ArticleCurator:
 
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse curator response as JSON: {e}")
-                logger.debug(f"Response text: {response_text}")
-                # スコアなしで返す
+                logger.debug(f"Response text: {response_text[:500]}")
+                # JSON パース失敗時はデフォルトスコアを使用
+                for i, article in enumerate(articles):
+                    article.curator_score = 5
+                    article.curator_summary = article.title[:60]
+                    article.genre = "unknown"
                 return articles
 
         except Exception as e:
