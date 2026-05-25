@@ -140,7 +140,7 @@ class MessageFormatter:
                         },
                         {
                             "type": "text",
-                            "text": stars if stars else "未評価",
+                            "text": f"{stars}（関連度）" if stars else "未評価",
                             "size": "xs",
                             "color": "#FFB300",
                             "margin": "md"
