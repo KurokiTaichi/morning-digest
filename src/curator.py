@@ -53,12 +53,12 @@ class ArticleCurator:
 - score 4以下: 関連薄い
 
 【出力形式】JSONのみ（説明不要）
-[{{"id": 1, "score": 0-10, "genre": "ai_tech|pm_product|business|finance", "summary_ja": "60字以内の日本語要約"}}]
+[{{"id": 1, "score": 0-10, "genre": "ai_tech|pm_product|business|finance", "summary_ja": "180字程度の詳しい日本語要約"}}]
 
 例：
 [
-  {{"id": 1, "score": 9, "genre": "ai_tech", "summary_ja": "OpenAI が新型モデルを発表。自動推論機能が大幅改善。"}},
-  {{"id": 2, "score": 6, "genre": "business", "summary_ja": "スタートアップの資金調達方法について。VCとの交渉ポイント解説。"}}
+  {{"id": 1, "score": 9, "genre": "ai_tech", "summary_ja": "OpenAI が新型AIモデルを発表。自動推論機能が大幅改善され、従来のモデルより35%高速化。複雑な問題解決能力も向上し、研究開発やビジネス応用での期待が高まっている。実装方法やAPI の詳細も発表予定。"}},
+  {{"id": 2, "score": 6, "genre": "business", "summary_ja": "スタートアップの資金調達における重要ポイントを詳解。VC との交渉時に押さえるべき論点、投資条件の交渉術、デューデリジェンス対策などを実例を交えて説明。初期段階から後期段階までの調達戦略の違いも解説。"}}
 ]
 """
 
