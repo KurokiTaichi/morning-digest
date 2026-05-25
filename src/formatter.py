@@ -31,6 +31,11 @@ class MessageFormatter:
             return "📅 日時不明"
 
         from datetime import datetime, timezone
+
+        # published_at がタイムゾーン非対応の場合、UTC として扱う
+        if published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=timezone.utc)
+
         now = datetime.now(timezone.utc)
         diff = now - published_at
 
