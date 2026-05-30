@@ -157,8 +157,7 @@ class MessageFormatter:
                             "action": {
                                 "type": "uri",
                                 "label": "記事を読む",
-                                "uri": article.url,
-                                "preferredDisplayMethod": "external"
+                                "uri": article.url
                             },
                             "style": "link",
                             "height": "sm"
