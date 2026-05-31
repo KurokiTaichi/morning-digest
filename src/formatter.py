@@ -11,7 +11,7 @@ class MessageFormatter:
     """キュレーション済み記事を LINE フレックスメッセージに整形"""
 
     def format_line_message(self, articles: list[Article]) -> dict:
-        """LINE フレックスメッセージ（Flex Message）を生成"""
+        """LINE フレックスメッセージ（カード内に評価理由を含める）"""
         if not articles:
             return {
                 "type": "text",
@@ -92,6 +92,10 @@ class MessageFormatter:
         """LINE フレックスメッセージを構築"""
         timestamp = datetime.now().strftime("%m月%d日")
 
+        # デバッグ
+        with_reason = sum(1 for a in articles if a.curator_reason)
+        logger.info(f"Building flex message with {len(articles)} articles, {with_reason} with reasons")
+
         bubbles = []
         for article in articles:
             genre_config = GENRES.get(article.genre, {})
@@ -155,7 +159,7 @@ class MessageFormatter:
                     "wrap": True
                 })
 
-            # 評価理由があれば追加（星付き）
+            # 評価理由があれば追加
             if article.curator_reason:
                 star_rating = "★" * min(5, (article.curator_score or 0) // 2) if article.curator_score else ""
                 reason_text = f"{star_rating} {article.curator_reason}" if star_rating else article.curator_reason
@@ -163,8 +167,9 @@ class MessageFormatter:
                     "type": "text",
                     "text": reason_text,
                     "size": "xs",
-                    "color": "#999999",
-                    "margin": "md"
+                    "color": "#666666",
+                    "margin": "md",
+                    "wrap": True
                 })
 
             bubble = {

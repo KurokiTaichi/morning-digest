@@ -207,6 +207,9 @@ class ArticleCurator:
                     articles[current_id - 1].curator_reason = current_reason.strip()
 
             logger.info("Generated evaluation reasons")
+            # デバッグ: 評価理由の統計
+            with_reason = sum(1 for a in articles if a.curator_reason)
+            logger.info(f"Articles with reasons: {with_reason}/{len(articles)}")
             return articles
 
         except Exception as e:
