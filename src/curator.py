@@ -159,7 +159,7 @@ class ArticleCurator:
         if not articles:
             return articles
 
-        reasons_prompt = """各記事のスコア根拠を30-50字で。改行なし。
+        reasons_prompt = """各記事の評価理由を40文字以内で。改行なし。
 
 """
         for i, article in enumerate(articles):
