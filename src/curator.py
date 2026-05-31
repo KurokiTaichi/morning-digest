@@ -161,24 +161,43 @@ class ArticleCurator:
 
             response_text = response.content[0].text
 
-            # 出力をパース
+            # 出力をパース（複数行対応）
+            current_id = None
+            current_reason = ""
+
             for line in response_text.strip().split("\n"):
-                if ":" not in line:
-                    continue
-                try:
-                    id_str, reason = line.split(":", 1)
-                    article_id = int(id_str.replace("ID", "").strip())
-                    if 0 < article_id <= len(articles):
-                        articles[article_id - 1].curator_reason = reason.strip()
-                except (ValueError, IndexError):
-                    pass
+                # ID行を検出
+                if line.startswith("ID") and ":" in line:
+                    # 前の ID のデータを保存
+                    if current_id and current_reason:
+                        if 0 < current_id <= len(articles):
+                            articles[current_id - 1].curator_reason = current_reason.strip()
+
+                    # 新しい ID を処理
+                    try:
+                        id_str, reason = line.split(":", 1)
+                        current_id = int(id_str.replace("ID", "").strip())
+                        current_reason = reason.strip()
+                    except (ValueError, IndexError):
+                        current_id = None
+                        current_reason = ""
+                elif current_id and line.strip():
+                    # 継続行を追加
+                    current_reason += " " + line.strip()
+
+            # 最後の ID を保存
+            if current_id and current_reason:
+                if 0 < current_id <= len(articles):
+                    articles[current_id - 1].curator_reason = current_reason.strip()
 
             logger.info("Generated evaluation reasons")
             return articles
 
         except Exception as e:
+            import traceback
             logger.error(f"Error generating evaluation reasons: {e}")
-            # 理由なしで返す
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # デフォルト値を設定
             for article in articles:
                 article.curator_reason = ""
             return articles
