@@ -159,15 +159,14 @@ class ArticleCurator:
         if not articles:
             return articles
 
-        reasons_prompt = """以下の記事について、スコアが付いています。各記事について「なぜこのスコアなのか」を50-80字で説明してください。
-改行は含めないでください。
+        reasons_prompt = """各記事のスコア根拠を30-50字で。改行なし。
 
 """
         for i, article in enumerate(articles):
             score = article.curator_score or 5
-            reasons_prompt += f"ID{i+1} (スコア{score}): {article.title}\n"
+            reasons_prompt += f"ID{i+1}: {article.title}\n"
 
-        reasons_prompt += "\n出力形式: ID番号: 理由テキスト"
+        reasons_prompt += "\n出力: ID番号: 根拠テキスト"
 
         try:
             response = self.client.messages.create(
