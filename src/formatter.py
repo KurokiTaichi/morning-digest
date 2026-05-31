@@ -152,8 +152,7 @@ class MessageFormatter:
                     "text": article.curator_reason,
                     "size": "xs",
                     "color": "#999999",
-                    "margin": "sm",
-                    "wrap": True
+                    "margin": "md"
                 })
 
             bubble = {
