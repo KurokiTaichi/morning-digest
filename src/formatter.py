@@ -88,64 +88,76 @@ class MessageFormatter:
             score = article.curator_score or 0
             stars = "⭐" * min(5, score // 2)
 
+            body_contents = [
+                {
+                    "type": "box",
+                    "layout": "baseline",
+                    "spacing": "sm",
+                    "contents": [
+                        {
+                            "type": "text",
+                            "text": emoji,
+                            "size": "sm",
+                            "color": "#aaaaaa"
+                        },
+                        {
+                            "type": "text",
+                            "text": genre_label,
+                            "size": "sm",
+                            "color": "#aaaaaa",
+                            "margin": "md",
+                            "flex": 0
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "text": article.title[:50],
+                    "weight": "bold",
+                    "size": "md",
+                    "margin": "md",
+                    "wrap": True
+                },
+                {
+                    "type": "text",
+                    "text": (article.curator_summary[:180] if article.curator_summary and len(article.curator_summary) > 180 else article.curator_summary) if article.curator_summary else "",
+                    "size": "xs",
+                    "color": "#666666",
+                    "margin": "md",
+                    "wrap": True
+                },
+                {
+                    "type": "text",
+                    "text": self._format_date(article.published_at),
+                    "size": "xxs",
+                    "color": "#999999",
+                    "margin": "md"
+                },
+                {
+                    "type": "text",
+                    "text": f"{stars}" if stars else "未評価",
+                    "size": "xs",
+                    "color": "#FFB300",
+                    "margin": "md"
+                }
+            ]
+
+            # 評価理由があれば追加
+            if article.curator_reason:
+                body_contents.append({
+                    "type": "text",
+                    "text": article.curator_reason,
+                    "size": "xxs",
+                    "color": "#999999",
+                    "margin": "sm"
+                })
+
             bubble = {
                 "type": "bubble",
                 "body": {
                     "type": "box",
                     "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "box",
-                            "layout": "baseline",
-                            "spacing": "sm",
-                            "contents": [
-                                {
-                                    "type": "text",
-                                    "text": emoji,
-                                    "size": "sm",
-                                    "color": "#aaaaaa"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": genre_label,
-                                    "size": "sm",
-                                    "color": "#aaaaaa",
-                                    "margin": "md",
-                                    "flex": 0
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "text": article.title[:50],
-                            "weight": "bold",
-                            "size": "md",
-                            "margin": "md",
-                            "wrap": True
-                        },
-                        {
-                            "type": "text",
-                            "text": (article.curator_summary[:180] if article.curator_summary and len(article.curator_summary) > 180 else article.curator_summary) if article.curator_summary else "",
-                            "size": "xs",
-                            "color": "#666666",
-                            "margin": "md",
-                            "wrap": True
-                        },
-                        {
-                            "type": "text",
-                            "text": self._format_date(article.published_at),
-                            "size": "xxs",
-                            "color": "#999999",
-                            "margin": "md"
-                        },
-                        {
-                            "type": "text",
-                            "text": f"{stars}（関連度）" if stars else "未評価",
-                            "size": "xs",
-                            "color": "#FFB300",
-                            "margin": "md"
-                        }
-                    ]
+                    "contents": body_contents
                 },
                 "footer": {
                     "type": "box",

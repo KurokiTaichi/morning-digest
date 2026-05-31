@@ -15,6 +15,7 @@ class Article:
     genre: Optional[str] = None
     curator_score: Optional[int] = None  # Claude キュレーション後のスコア（0-10）
     curator_summary: Optional[str] = None  # Claude による日本語要約
+    curator_reason: Optional[str] = None  # Claude による評価理由
 
 
 class BaseCollector(ABC):

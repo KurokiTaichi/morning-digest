@@ -17,7 +17,7 @@ class ArticleCurator:
     def curate(self, articles: list[Article]) -> list[Article]:
         """
         全記事を Claude Haiku で一括評価
-        スコア（0-10）とジャンルを付与、別処理で日本語要約を生成
+        スコア（0-10）とジャンルを付与、別処理で日本語要約と評価理由を生成
         """
         if not articles:
             return []
@@ -27,6 +27,9 @@ class ArticleCurator:
 
         # ステップ2: 日本語要約の生成
         articles = self._generate_summaries(articles)
+
+        # ステップ3: 評価理由の生成
+        articles = self._generate_evaluation_reasons(articles)
 
         return articles
 
@@ -132,4 +135,50 @@ class ArticleCurator:
             # 要約なしで返す
             for article in articles:
                 article.curator_summary = ""
+            return articles
+
+    def _generate_evaluation_reasons(self, articles: list[Article]) -> list[Article]:
+        """評価理由を生成"""
+        if not articles:
+            return articles
+
+        reasons_prompt = """以下の記事について、スコアが付いています。各記事について「なぜこのスコアなのか」を30字程度で簡潔に説明してください。
+改行は含めないでください。
+
+"""
+        for i, article in enumerate(articles):
+            score = article.curator_score or 5
+            reasons_prompt += f"ID{i+1} (スコア{score}): {article.title}\n"
+
+        reasons_prompt += "\n出力形式: ID番号: 理由テキスト"
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[{"role": "user", "content": reasons_prompt}]
+            )
+
+            response_text = response.content[0].text
+
+            # 出力をパース
+            for line in response_text.strip().split("\n"):
+                if ":" not in line:
+                    continue
+                try:
+                    id_str, reason = line.split(":", 1)
+                    article_id = int(id_str.replace("ID", "").strip())
+                    if 0 < article_id <= len(articles):
+                        articles[article_id - 1].curator_reason = reason.strip()[:80]
+                except (ValueError, IndexError):
+                    pass
+
+            logger.info("Generated evaluation reasons")
+            return articles
+
+        except Exception as e:
+            logger.error(f"Error generating evaluation reasons: {e}")
+            # 理由なしで返す
+            for article in articles:
+                article.curator_reason = ""
             return articles
