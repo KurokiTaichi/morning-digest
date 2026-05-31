@@ -124,13 +124,6 @@ class MessageFormatter:
                     "size": "xxs",
                     "color": "#999999",
                     "margin": "md"
-                },
-                {
-                    "type": "text",
-                    "text": f"{stars}" if stars else "未評価",
-                    "size": "xs",
-                    "color": "#FFB300",
-                    "margin": "md"
                 }
             ]
 
@@ -145,11 +138,13 @@ class MessageFormatter:
                     "wrap": True
                 })
 
-            # 評価理由があれば追加
+            # 評価理由があれば追加（星付き）
             if article.curator_reason:
+                star_rating = "★" * min(5, (article.curator_score or 0) // 2) if article.curator_score else ""
+                reason_text = f"{star_rating} {article.curator_reason}" if star_rating else article.curator_reason
                 body_contents.append({
                     "type": "text",
-                    "text": article.curator_reason,
+                    "text": reason_text,
                     "size": "xs",
                     "color": "#999999",
                     "margin": "md"
