@@ -90,20 +90,16 @@ class ArticleCurator:
 
     def _generate_summaries(self, articles: list[Article]) -> list[Article]:
         """日本語要約を生成"""
-        # スコアが 5 以上の記事だけ要約を生成
-        high_score_articles = [a for a in articles if a.curator_score and a.curator_score >= 5]
-
-        if not high_score_articles:
-            for article in articles:
-                article.curator_summary = ""
+        # すべての記事に要約を生成
+        if not articles:
             return articles
 
         summaries_prompt = """以下のタイトルについて、60-100字の日本語要約を1行で生成してください。
 改行は含めないでください。
 
 """
-        for article in high_score_articles:
-            summaries_prompt += f"ID{articles.index(article)+1}: {article.title}\n"
+        for i, article in enumerate(articles):
+            summaries_prompt += f"ID{i+1}: {article.title}\n"
 
         summaries_prompt += "\n出力形式: ID番号: 要約テキスト"
 
