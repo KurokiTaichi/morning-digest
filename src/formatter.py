@@ -150,9 +150,10 @@ class MessageFormatter:
                 body_contents.append({
                     "type": "text",
                     "text": article.curator_reason,
-                    "size": "xxs",
+                    "size": "xs",
                     "color": "#999999",
-                    "margin": "sm"
+                    "margin": "sm",
+                    "wrap": True
                 })
 
             bubble = {
