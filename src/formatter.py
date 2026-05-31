@@ -145,15 +145,15 @@ class MessageFormatter:
                     "wrap": True
                 })
 
-            # 評価理由があれば追加（一時的に無効化：LINE メッセージサイズ最適化）
-            # if article.curator_reason:
-            #     body_contents.append({
-            #         "type": "text",
-            #         "text": article.curator_reason,
-            #         "size": "xs",
-            #         "color": "#999999",
-            #         "margin": "md"
-            #     })
+            # 評価理由があれば追加
+            if article.curator_reason:
+                body_contents.append({
+                    "type": "text",
+                    "text": article.curator_reason,
+                    "size": "xs",
+                    "color": "#999999",
+                    "margin": "md"
+                })
 
             bubble = {
                 "type": "bubble",
