@@ -112,14 +112,6 @@ class MessageFormatter:
                 },
                 {
                     "type": "text",
-                    "text": article.title[:50],
-                    "weight": "bold",
-                    "size": "md",
-                    "margin": "md",
-                    "wrap": True
-                },
-                {
-                    "type": "text",
                     "text": self._format_date(article.published_at),
                     "size": "xxs",
                     "color": "#999999",
@@ -127,13 +119,24 @@ class MessageFormatter:
                 }
             ]
 
-            # 要約があれば追加
+            # 日本語要約をメイン要素として追加
             if article.curator_summary:
-                body_contents.insert(3, {
+                body_contents.append({
                     "type": "text",
                     "text": article.curator_summary,
-                    "size": "xs",
-                    "color": "#666666",
+                    "weight": "bold",
+                    "size": "sm",
+                    "color": "#333333",
+                    "margin": "md",
+                    "wrap": True
+                })
+            else:
+                # 要約がない場合、タイトルをフォールバック
+                body_contents.append({
+                    "type": "text",
+                    "text": article.title[:80],
+                    "weight": "bold",
+                    "size": "sm",
                     "margin": "md",
                     "wrap": True
                 })
