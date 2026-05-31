@@ -25,10 +25,22 @@ class MessageFormatter:
 
         return self._build_flex_message(selected)
 
-    def _format_date(self, published_at) -> str:
-        """記事の作成日時をフォーマット"""
+    def _get_country_flag(self, source: str) -> str:
+        """source から国フラグを取得"""
+        source_lower = source.lower()
+
+        # 日本のソース
+        if any(jp in source_lower for jp in ["japan", "jp", "日本"]):
+            return "🇯🇵"
+
+        # 英語圏のソース（デフォルト）
+        return "🇺🇸"
+
+    def _format_date(self, published_at, source: str = "") -> str:
+        """記事の作成日時をフォーマット（国フラグ付き）"""
         if not published_at:
-            return "📅 日時不明"
+            country = self._get_country_flag(source) if source else ""
+            return f"📅 日時不明 {country}".strip()
 
         from datetime import datetime, timezone
 
@@ -39,16 +51,18 @@ class MessageFormatter:
         now = datetime.now(timezone.utc)
         diff = now - published_at
 
+        country = self._get_country_flag(source) if source else ""
+
         if diff.days == 0:
             hours = diff.seconds // 3600
             if hours == 0:
                 minutes = diff.seconds // 60
-                return f"📅 {minutes}分前"
-            return f"📅 {hours}時間前"
+                return f"📅 {minutes}分前 {country}".strip()
+            return f"📅 {hours}時間前 {country}".strip()
         elif diff.days == 1:
-            return "📅 1日前"
+            return f"📅 1日前 {country}".strip()
         else:
-            return f"📅 {published_at.strftime('%Y年%m月%d日')}"
+            return f"📅 {published_at.strftime('%Y年%m月%d日')} {country}".strip()
 
     def _select_balanced_articles(self, articles: list[Article], target_count: int) -> list[Article]:
         """ジャンルバランスを考慮して記事を選択"""
@@ -112,7 +126,7 @@ class MessageFormatter:
                 },
                 {
                     "type": "text",
-                    "text": self._format_date(article.published_at),
+                    "text": self._format_date(article.published_at, article.source),
                     "size": "xxs",
                     "color": "#999999",
                     "margin": "md"
