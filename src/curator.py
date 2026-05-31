@@ -97,8 +97,8 @@ class ArticleCurator:
         if not articles:
             return articles
 
-        summaries_prompt = """以下のタイトルについて、60-100字の日本語要約を1行で生成してください。
-改行は含めないでください。
+        summaries_prompt = """以下のニュースタイトルについて、60-100字の簡潔な日本語要約を1行で生成してください。
+【重要】改行やコロン以外の記号は絶対に含めないこと。ID番号と要約のみを出力。
 
 """
         for i, article in enumerate(articles):
@@ -115,17 +115,34 @@ class ArticleCurator:
 
             response_text = response.content[0].text
 
-            # 出力をパース
+            # 出力をパース（複数行対応）
+            current_id = None
+            current_summary = ""
+
             for line in response_text.strip().split("\n"):
-                if ":" not in line:
-                    continue
-                try:
-                    id_str, summary = line.split(":", 1)
-                    article_id = int(id_str.replace("ID", "").strip())
-                    if 0 < article_id <= len(articles):
-                        articles[article_id - 1].curator_summary = summary.strip()[:100]
-                except (ValueError, IndexError):
-                    pass
+                # ID行を検出
+                if line.startswith("ID") and ":" in line:
+                    # 前の ID のデータを保存
+                    if current_id and current_summary:
+                        if 0 < current_id <= len(articles):
+                            articles[current_id - 1].curator_summary = current_summary.strip()[:100]
+
+                    # 新しい ID を処理
+                    try:
+                        id_str, summary = line.split(":", 1)
+                        current_id = int(id_str.replace("ID", "").strip())
+                        current_summary = summary.strip()
+                    except (ValueError, IndexError):
+                        current_id = None
+                        current_summary = ""
+                elif current_id and line.strip():
+                    # 継続行を追加
+                    current_summary += " " + line.strip()
+
+            # 最後の ID を保存
+            if current_id and current_summary:
+                if 0 < current_id <= len(articles):
+                    articles[current_id - 1].curator_summary = current_summary.strip()[:100]
 
             logger.info("Generated summaries")
             return articles
