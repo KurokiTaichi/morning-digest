@@ -120,14 +120,6 @@ class MessageFormatter:
                 },
                 {
                     "type": "text",
-                    "text": (article.curator_summary[:180] if article.curator_summary and len(article.curator_summary) > 180 else article.curator_summary) if article.curator_summary else "",
-                    "size": "xs",
-                    "color": "#666666",
-                    "margin": "md",
-                    "wrap": True
-                },
-                {
-                    "type": "text",
                     "text": self._format_date(article.published_at),
                     "size": "xxs",
                     "color": "#999999",
@@ -141,6 +133,17 @@ class MessageFormatter:
                     "margin": "md"
                 }
             ]
+
+            # 要約があれば追加
+            if article.curator_summary:
+                body_contents.insert(3, {
+                    "type": "text",
+                    "text": article.curator_summary,
+                    "size": "xs",
+                    "color": "#666666",
+                    "margin": "md",
+                    "wrap": True
+                })
 
             # 評価理由があれば追加
             if article.curator_reason:

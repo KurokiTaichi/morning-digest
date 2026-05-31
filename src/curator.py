@@ -142,7 +142,7 @@ class ArticleCurator:
         if not articles:
             return articles
 
-        reasons_prompt = """以下の記事について、スコアが付いています。各記事について「なぜこのスコアなのか」を30字程度で簡潔に説明してください。
+        reasons_prompt = """以下の記事について、スコアが付いています。各記事について「なぜこのスコアなのか」を50-80字で説明してください。
 改行は含めないでください。
 
 """
@@ -169,7 +169,7 @@ class ArticleCurator:
                     id_str, reason = line.split(":", 1)
                     article_id = int(id_str.replace("ID", "").strip())
                     if 0 < article_id <= len(articles):
-                        articles[article_id - 1].curator_reason = reason.strip()[:80]
+                        articles[article_id - 1].curator_reason = reason.strip()
                 except (ValueError, IndexError):
                     pass
 
