@@ -67,18 +67,47 @@ class ArticleCurator:
 
             response_text = response.content[0].text
 
-            # 各行をパース
-            for line in response_text.strip().split("\n"):
-                if not line.strip():
-                    continue
-                try:
-                    result = json.loads(line)
-                    article_id = result.get("id")
+            # マークダウンコードブロックを削除
+            if response_text.startswith("```"):
+                response_text = response_text.strip()
+                # ``` で囲まれている場合を処理
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]  # ```json を削除
+                elif response_text.startswith("```"):
+                    response_text = response_text[3:]  # ``` を削除
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]  # 最後の ``` を削除
+                response_text = response_text.strip()
+
+            # JSON配列またはJSONL形式をパース
+            try:
+                # JSON配列の可能性
+                results = json.loads(response_text)
+                if isinstance(results, list):
+                    for result in results:
+                        article_id = result.get("id")
+                        if article_id and 0 < article_id <= len(articles):
+                            articles[article_id - 1].curator_score = result.get("score", 5)
+                            articles[article_id - 1].genre = result.get("genre", "unknown")
+                else:
+                    # 単一オブジェクト
+                    article_id = results.get("id")
                     if article_id and 0 < article_id <= len(articles):
-                        articles[article_id - 1].curator_score = result.get("score", 5)
-                        articles[article_id - 1].genre = result.get("genre", "unknown")
-                except json.JSONDecodeError:
-                    pass
+                        articles[article_id - 1].curator_score = results.get("score", 5)
+                        articles[article_id - 1].genre = results.get("genre", "unknown")
+            except json.JSONDecodeError:
+                # JSONL形式（1行1個のJSON）の可能性
+                for line in response_text.strip().split("\n"):
+                    if not line.strip():
+                        continue
+                    try:
+                        result = json.loads(line)
+                        article_id = result.get("id")
+                        if article_id and 0 < article_id <= len(articles):
+                            articles[article_id - 1].curator_score = result.get("score", 5)
+                            articles[article_id - 1].genre = result.get("genre", "unknown")
+                    except json.JSONDecodeError:
+                        pass
 
             logger.info(f"Evaluated {len(articles)} articles")
             return articles
@@ -145,6 +174,10 @@ class ArticleCurator:
                     articles[current_id - 1].curator_summary = current_summary.strip()[:100]
 
             logger.info("Generated summaries")
+
+            # 要約がない記事のタイトルを日本語に翻訳
+            articles = self._translate_missing_titles(articles)
+
             return articles
 
         except Exception as e:
@@ -152,6 +185,72 @@ class ArticleCurator:
             # 要約なしで返す
             for article in articles:
                 article.curator_summary = ""
+            return articles
+
+    def _translate_missing_titles(self, articles: list[Article]) -> list[Article]:
+        """要約がない記事のタイトルを日本語に翻訳"""
+        missing_articles = [a for a in articles if not a.curator_summary]
+        if not missing_articles:
+            return articles
+
+        # 翻訳対象を集める
+        titles_to_translate = {}
+        for article in missing_articles:
+            titles_to_translate[article.title] = article
+
+        # Claude でまとめて翻訳
+        translate_prompt = """以下の英語タイトルを日本語に翻訳してください。簡潔に60字以内で。
+
+"""
+        for i, title in enumerate(titles_to_translate.keys(), 1):
+            translate_prompt += f"ID{i}: {title}\n"
+
+        translate_prompt += "\n出力形式: ID番号: 日本語翻訳"
+
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=500,
+                messages=[{"role": "user", "content": translate_prompt}]
+            )
+
+            response_text = response.content[0].text
+
+            # 翻訳結果をパース
+            title_list = list(titles_to_translate.keys())
+            current_id = None
+            current_translation = ""
+
+            for line in response_text.strip().split("\n"):
+                if line.startswith("ID") and ":" in line:
+                    # 前の ID のデータを保存
+                    if current_id and current_translation:
+                        if 0 < current_id <= len(title_list):
+                            article = titles_to_translate[title_list[current_id - 1]]
+                            article.curator_summary = current_translation.strip()[:100]
+
+                    # 新しい ID を処理
+                    try:
+                        id_str, translation = line.split(":", 1)
+                        current_id = int(id_str.replace("ID", "").strip())
+                        current_translation = translation.strip()
+                    except (ValueError, IndexError):
+                        current_id = None
+                        current_translation = ""
+                elif current_id and line.strip():
+                    current_translation += " " + line.strip()
+
+            # 最後の ID を保存
+            if current_id and current_translation:
+                if 0 < current_id <= len(title_list):
+                    article = titles_to_translate[title_list[current_id - 1]]
+                    article.curator_summary = current_translation.strip()[:100]
+
+            logger.info(f"Translated {len(missing_articles)} missing titles")
+            return articles
+
+        except Exception as e:
+            logger.error(f"Error translating titles: {e}")
             return articles
 
     def _generate_evaluation_reasons(self, articles: list[Article]) -> list[Article]:
